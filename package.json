@@ -1,0 +1,12 @@
+{
+  "name": "investment-atlas",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev --prefix server\" \"npm:dev --prefix client\"",
+    "start": "concurrently -n server,client -c blue,magenta \"npm:start --prefix server\" \"npm:dev --prefix client\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

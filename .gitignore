@@ -1,0 +1,27 @@
+# Node
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Vite
+client/dist/
+
+# Server data
+server/data/investments.xlsx
+server/uploads/
+
+# Env
+.env
+.env.*
