@@ -1,5 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 
+const PAGE_SIZE = 10;
+
 function Ledger({
   investments,
   form,
@@ -29,10 +31,61 @@ function Ledger({
   const [lastQuery, setLastQuery] = useState("");
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [filters, setFilters] = useState({
+    type: "",
+    category: "",
+    flow: "",
+    text: "",
+    from: "",
+    to: "",
+  });
+  const [page, setPage] = useState(1);
 
-  const sortedInvestments = [...investments].sort((a, b) =>
-    b.date.localeCompare(a.date)
+  const sortedInvestments = useMemo(
+    () => [...investments].sort((a, b) => b.date.localeCompare(a.date)),
+    [investments]
   );
+
+  const filteredInvestments = useMemo(() => {
+    const text = filters.text.trim().toLowerCase();
+    return sortedInvestments.filter((item) => {
+      const matchesType = filters.type ? item.type === filters.type : true;
+      const matchesCategory = filters.category
+        ? item.category === filters.category
+        : true;
+      const matchesFlow = filters.flow
+        ? String(item.direction || "credit").toLowerCase() === filters.flow
+        : true;
+      const matchesFrom = filters.from ? item.date >= filters.from : true;
+      const matchesTo = filters.to ? item.date <= filters.to : true;
+      const matchesText = text
+        ? `${item.name || ""} ${item.notes || ""} ${item.type || ""} ${
+            item.category || ""
+          }`
+            .toLowerCase()
+            .includes(text)
+        : true;
+      return (
+        matchesType &&
+        matchesCategory &&
+        matchesFlow &&
+        matchesFrom &&
+        matchesTo &&
+        matchesText
+      );
+    });
+  }, [sortedInvestments, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInvestments.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageSlice = filteredInvestments.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, investments.length]);
 
   // Debounced autocomplete requests to reduce API calls.
   useEffect(() => {
@@ -357,6 +410,93 @@ function Ledger({
             <h3>Ledger</h3>
             <p className="muted">Stored locally at `server/data/investments.xlsx`.</p>
           </div>
+          <div className="filter-bar">
+            <div>
+              <label>Type</label>
+              <select
+                value={filters.type}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, type: event.target.value }))
+                }
+              >
+                <option value="">All</option>
+                {defaultTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>Category</label>
+              <select
+                value={filters.category}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, category: event.target.value }))
+                }
+              >
+                <option value="">All</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>Flow</label>
+              <select
+                value={filters.flow}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, flow: event.target.value }))
+                }
+              >
+                <option value="">All</option>
+                <option value="credit">Credit</option>
+                <option value="debit">Debit</option>
+              </select>
+            </div>
+            <div>
+              <label>Search</label>
+              <input
+                type="text"
+                value={filters.text}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, text: event.target.value }))
+                }
+                placeholder="Name or notes"
+              />
+            </div>
+            <div>
+              <label>From</label>
+              <input
+                type="date"
+                value={filters.from}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, from: event.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label>To</label>
+              <input
+                type="date"
+                value={filters.to}
+                onChange={(event) =>
+                  setFilters((prev) => ({ ...prev, to: event.target.value }))
+                }
+              />
+            </div>
+            <button
+              className="button ghost tiny"
+              type="button"
+              onClick={() =>
+                setFilters({ type: "", category: "", flow: "", text: "", from: "", to: "" })
+              }
+            >
+              Clear Filters
+            </button>
+          </div>
           <div className="ledger-table">
             <div className="ledger-row ledger-head">
               <span>Type</span>
@@ -368,10 +508,10 @@ function Ledger({
               <span>Notes</span>
               <span></span>
             </div>
-            {sortedInvestments.length === 0 && (
-              <div className="ledger-empty">Add your first investment.</div>
+            {pageSlice.length === 0 && (
+              <div className="ledger-empty">No entries match your filters.</div>
             )}
-            {sortedInvestments.map((item) => {
+            {pageSlice.map((item) => {
               const amount = Number(item.amount || 0);
               const isDebit = String(item.direction || "credit").toLowerCase() === "debit";
               const signedAmount = isDebit ? -Math.abs(amount) : amount;
@@ -402,6 +542,45 @@ function Ledger({
                 </div>
               );
             })}
+          </div>
+          <div className="pagination">
+            <span className="muted">
+              Page {currentPage} of {totalPages} • {filteredInvestments.length} items
+            </span>
+            <div className="pagination-controls">
+              <button
+                className="button ghost tiny"
+                type="button"
+                onClick={() => setPage(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </button>
+              <button
+                className="button ghost tiny"
+                type="button"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <button
+                className="button ghost tiny"
+                type="button"
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+              <button
+                className="button ghost tiny"
+                type="button"
+                onClick={() => setPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                Last
+              </button>
+            </div>
           </div>
         </section>
       </section>
