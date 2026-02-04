@@ -8,7 +8,6 @@ A local-first investment tracker with Excel storage, a Node.js API, and a React 
 ![Dashboard Filters + Exposures](docs/images/dashboard2.png)
 ![Ledger Overview](docs/images/ledger1.png)
 ![Ledger Detail](docs/images/ledger2.png)
-![Ledger Edit Drawer](docs/images/ledger3.png)
 
 ## Features
 
