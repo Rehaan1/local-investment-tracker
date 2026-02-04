@@ -1,70 +1,83 @@
-﻿# Investment Atlas - Developer Notes
+﻿# Architecture & Maintenance Notes
 
-This document is a short, practical guide for maintaining and extending the codebase.
+## Overview
 
-## Architecture
-
-- `client/` is a React + Vite UI.
-- `server/` is an Express API that reads/writes an Excel ledger.
-- Data is stored locally at `server/data/investments.xlsx`.
-
-## Key Flows
-
-- **Ledger CRUD**
-  - `GET /api/investments` loads entries.
-  - `POST /api/investments` adds an entry.
-  - `PUT /api/investments/:id` edits an entry.
-  - `DELETE /api/investments/:id` removes an entry.
-
-- **Summary for charts**
-  - `GET /api/summary` computes totals by type/category/month.
-
-- **Excel import/export**
-  - `GET /api/export` downloads the ledger.
-  - `POST /api/import` replaces the ledger.
-
-- **Autocomplete**
-  - `GET /api/autocomplete?q=` for suggestions.
-  - `POST /api/autocomplete/clear` clears server cache.
-
-## Environment
-
-- `server/.env` should include:
+Investment Atlas is a local-first investment tracker with a React UI and an Express API. It stores data in a local Excel file and can back it up to Google Drive.
 
 ```
-ALPHA_VANTAGE_KEY=your_key_here
+client/   React + Vite UI
+server/   Express API + Excel persistence
 ```
 
-Autocomplete also falls back to MFAPI for Indian mutual funds.
+## Runtime Data Flow
 
-## How data is stored
+1. UI loads and calls `/api/investments` and `/api/summary`.
+2. Server reads `investments.xlsx` via ExcelJS and returns JSON.
+3. UI renders charts and the ledger.
 
-Rows are normalized before write. The current schema is:
+## Persistence
+
+- Dev storage: `server/data/investments.xlsx`
+- Packaged exe storage: `%APPDATA%\InvestmentAtlas\investments.xlsx`
+
+Schema columns:
 
 ```
 id, type, category, name, direction, amount, date, notes, createdAt
 ```
 
-## Common maintenance tasks
+## API Surface
 
-- **Add a new field**
-  - Update `HEADERS` in `server/index.js`.
-  - Update normalization in `normalizeInvestment`.
-  - Update UI forms + tables.
+- `GET /api/investments`
+- `POST /api/investments`
+- `PUT /api/investments/:id`
+- `DELETE /api/investments/:id`
+- `GET /api/summary`
+- `GET /api/export`
+- `POST /api/import`
+- `GET /api/autocomplete?q=`
+- `POST /api/autocomplete/clear`
+- `GET /api/drive/status`
+- `GET /api/drive/auth-url`
+- `GET /api/drive/oauth2callback`
+- `POST /api/drive/backup`
 
-- **Change chart metrics**
-  - Update `GET /api/summary` in `server/index.js`.
-  - Update charts in `client/src/pages/Dashboard.jsx`.
+## Autocomplete Providers
 
-- **Autocomplete providers**
-  - `fetchAlphaSuggestions` and `fetchMfapiSuggestions` live in `server/index.js`.
+- Primary: MFAPI (`https://api.mfapi.in/mf/search`)
+- Fallback: Alpha Vantage (`SYMBOL_SEARCH`)
 
-## Dev commands
+Results are cached in memory to reduce API calls.
 
-From repo root:
+## Google Drive Backup
+
+OAuth token is stored at:
 
 ```
-npm run dev
+server/.drive_token.json
 ```
 
-Starts both server and client.
+The backup flow creates/uses a folder named `Investment Atlas` and uploads/updates `investments.xlsx`.
+
+## Packaging (Option 5)
+
+The `pkg` build bundles the server and built client into a single exe.
+
+```
+npm run build:exe
+```
+
+The server serves `client/dist` from within the packaged snapshot.
+
+## Maintenance Tasks
+
+- Add a new field:
+  - Update `HEADERS` in `server/index.js`
+  - Update `normalizeInvestment`
+  - Update UI forms + tables
+- Change dashboard metrics:
+  - Update `GET /api/summary`
+  - Update `client/src/pages/Dashboard.jsx`
+- Add new provider:
+  - Add a new fetch function in `server/index.js`
+  - Integrate it into `/api/autocomplete`
