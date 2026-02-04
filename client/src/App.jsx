@@ -131,6 +131,24 @@ function App() {
     }
   }
 
+  async function handleUpdate(id, updates) {
+    try {
+      setError("");
+      const res = await fetch(`/api/investments/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const msg = await res.json();
+        throw new Error(msg.error || "Unable to update investment.");
+      }
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Unable to update investment.");
+    }
+  }
+
   async function handleImport() {
     if (!importFile) return;
     try {
@@ -198,6 +216,7 @@ function App() {
                 categories={CATEGORY_OPTIONS}
                 handleAdd={handleAdd}
                 handleDelete={handleDelete}
+                handleUpdate={handleUpdate}
                 handleExport={handleExport}
                 handleImport={handleImport}
                 importFile={importFile}

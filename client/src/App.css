@@ -185,6 +185,11 @@
   padding: 8px 12px;
 }
 
+.button.tiny {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
 .grid {
   display: grid;
   gap: 24px;
@@ -249,11 +254,6 @@
 .cache-row {
   display: flex;
   justify-content: flex-end;
-}
-
-.button.tiny {
-  padding: 8px 14px;
-  font-size: 0.85rem;
 }
 
 .form-panel input,
@@ -344,12 +344,18 @@
 
 .ledger-row {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 1.2fr 0.8fr 0.9fr 0.9fr 1.4fr 0.6fr;
+  grid-template-columns: 1.1fr 1fr 1.2fr 0.8fr 0.9fr 0.9fr 1.4fr 0.9fr;
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.75);
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .ledger-head {
@@ -365,48 +371,119 @@
   background: rgba(255, 255, 255, 0.6);
 }
 
-.chip {
-  display: inline-flex;
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 13, 20, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+.drawer {
+  width: min(460px, 100%);
+  height: 100%;
+  background: linear-gradient(160deg, #f8f9ff 0%, #eef2ff 100%);
+  padding: 24px 26px 32px;
+  box-shadow: -20px 0 40px rgba(15, 25, 40, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: slideIn 0.25s ease;
+  overflow: auto;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  width: fit-content;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(13, 25, 40, 0.08);
 }
 
-.chip.credit {
-  background: rgba(82, 113, 255, 0.15);
-  color: #2b46d8;
+.drawer-header h3 {
+  margin: 6px 0 0;
+  font-size: 1.4rem;
+  letter-spacing: -0.02em;
 }
 
-.chip.debit {
-  background: rgba(249, 65, 68, 0.2);
-  color: #b61b1f;
+.drawer-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 12px 24px rgba(15, 25, 40, 0.1);
 }
 
-.amount {
-  font-weight: 600;
-}
-
-.amount.negative {
-  color: #b61b1f;
-}
-
-.amount.positive {
-  color: #146b3a;
-}
-
-.error {
-  margin-top: 10px;
-  color: #b61b1f;
-  font-weight: 600;
-}
-
-.muted {
+.drawer-summary span {
+  font-size: 0.75rem;
   color: #60708a;
-  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.drawer-form {
+  display: grid;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 16px;
+  border-radius: 18px;
+  box-shadow: 0 10px 20px rgba(15, 25, 40, 0.06);
+}
+
+.drawer-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.drawer-form input,
+.drawer-form select {
+  appearance: none;
+  border: 1px solid rgba(13, 25, 40, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  background: white;
+  box-shadow: inset 0 1px 2px rgba(12, 20, 30, 0.06);
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drawer-form input:focus,
+.drawer-form select:focus {
+  outline: none;
+  border-color: rgba(82, 113, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(82, 113, 255, 0.2);
+}
+
+.drawer-form select {
+  background-image: linear-gradient(45deg, transparent 50%, #4b5b76 50%),
+    linear-gradient(135deg, #4b5b76 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 34px;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.drawer .button.ghost {
+  background: rgba(15, 25, 40, 0.06);
+  border: 1px solid rgba(15, 25, 40, 0.12);
+}
+
+.drawer .form-panel label,
+.drawer-form label {
+  color: #2b3d52;
 }
 
 @keyframes rise {
@@ -417,6 +494,26 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(12%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
 function Ledger({
   investments,
@@ -8,6 +8,7 @@ function Ledger({
   categories,
   handleAdd,
   handleDelete,
+  handleUpdate,
   handleExport,
   handleImport,
   importFile,
@@ -21,6 +22,8 @@ function Ledger({
   const [suggestError, setSuggestError] = useState("");
   const [noResults, setNoResults] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
+  const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState(null);
 
   const sortedInvestments = [...investments].sort((a, b) =>
     b.date.localeCompare(a.date)
@@ -91,6 +94,46 @@ function Ledger({
       setSuggestError("Unable to clear cache.");
     }
   }
+
+  function openEdit(item) {
+    setEditingItem(item);
+    setEditForm({
+      type: item.type || defaultTypes[0],
+      category: item.category || "",
+      name: item.name || "",
+      direction: item.direction || "credit",
+      amount: String(item.amount ?? ""),
+      date: item.date || "",
+      notes: item.notes || "",
+    });
+  }
+
+  function closeEdit() {
+    setEditingItem(null);
+    setEditForm(null);
+  }
+
+  async function submitEdit(event) {
+    event.preventDefault();
+    if (!editingItem || !editForm) return;
+    await handleUpdate(editingItem.id, {
+      type: editForm.type,
+      category: editForm.category,
+      name: editForm.name,
+      direction: editForm.direction,
+      amount: Number(editForm.amount),
+      date: editForm.date,
+      notes: editForm.notes,
+    });
+    closeEdit();
+  }
+
+  const editTotal = useMemo(() => {
+    if (!editingItem || !editForm) return 0;
+    const amount = Number(editForm.amount || 0);
+    const isDebit = String(editForm.direction || "credit").toLowerCase() === "debit";
+    return isDebit ? -Math.abs(amount) : amount;
+  }, [editingItem, editForm]);
 
   return (
     <main className="page">
@@ -309,7 +352,10 @@ function Ledger({
                     {currency.format(signedAmount)}
                   </span>
                   <span>{item.notes || "—"}</span>
-                  <span>
+                  <span className="row-actions">
+                    <button className="button ghost tiny" onClick={() => openEdit(item)}>
+                      Edit
+                    </button>
                     <button
                       className="button danger"
                       onClick={() => handleDelete(item.id)}
@@ -323,6 +369,133 @@ function Ledger({
           </div>
         </section>
       </section>
+
+      {editingItem && editForm && (
+        <div className="drawer-overlay" onClick={closeEdit}>
+          <aside className="drawer" onClick={(event) => event.stopPropagation()}>
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">Edit Entry</p>
+                <h3>{editForm.name || "Investment"}</h3>
+              </div>
+              <button className="button ghost tiny" onClick={closeEdit}>
+                Close
+              </button>
+            </div>
+            <div className="drawer-summary">
+              <div>
+                <span>Net Amount</span>
+                <strong
+                  className={editTotal < 0 ? "amount negative" : "amount positive"}
+                >
+                  {currency.format(editTotal)}
+                </strong>
+              </div>
+              <div>
+                <span>Date</span>
+                <strong>{editForm.date || "—"}</strong>
+              </div>
+            </div>
+            <form className="drawer-form" onSubmit={submitEdit}>
+              <label>
+                Type
+                <select
+                  value={editForm.type}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, type: event.target.value }))
+                  }
+                >
+                  {defaultTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cap / Category (optional)
+                <select
+                  value={editForm.category}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, category: event.target.value }))
+                  }
+                >
+                  <option value="">Unspecified</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Security Name
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Flow
+                <select
+                  value={editForm.direction}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, direction: event.target.value }))
+                  }
+                >
+                  <option value="credit">Credit (Invested)</option>
+                  <option value="debit">Debit (Withdrawn)</option>
+                </select>
+              </label>
+              <label>
+                Amount (INR)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.amount}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, amount: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Date Invested
+                <input
+                  type="date"
+                  value={editForm.date}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, date: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Notes
+                <input
+                  type="text"
+                  value={editForm.notes}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="drawer-actions">
+                <button className="button ghost" type="button" onClick={closeEdit}>
+                  Cancel
+                </button>
+                <button className="button primary" type="submit">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
