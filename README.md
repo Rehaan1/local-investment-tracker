@@ -29,6 +29,22 @@ npm run dev
 
 The API runs on `http://localhost:4000` and the UI on `http://localhost:5173`.
 
+## Autocomplete (Security Name)
+
+We use the Alpha Vantage `SYMBOL_SEARCH` endpoint for security name suggestions.
+
+1. Copy `server/.env.example` to `server/.env`
+2. Add your key:
+
+```
+ALPHA_VANTAGE_KEY=your_key_here
+```
+
+If no key is configured, autocomplete will stay disabled but everything else works.
+Results are cached for a few hours to reduce API calls. We also fall back to a
+secondary free API for Indian mutual funds when Alpha Vantage is rate-limited
+or returns no matches.
+
 ## Data File
 
 Your ledger is stored locally at:

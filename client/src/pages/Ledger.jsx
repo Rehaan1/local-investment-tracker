@@ -1,4 +1,6 @@
-﻿function Ledger({
+﻿import { useEffect, useState } from "react";
+
+function Ledger({
   investments,
   form,
   setForm,
@@ -14,9 +16,81 @@
   error,
   isLoading,
 }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState("");
+  const [noResults, setNoResults] = useState(false);
+  const [lastQuery, setLastQuery] = useState("");
+
   const sortedInvestments = [...investments].sort((a, b) =>
     b.date.localeCompare(a.date)
   );
+
+  useEffect(() => {
+    if (!form.name || form.name.trim().length < 2) {
+      setSuggestions([]);
+      setNoResults(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const handle = setTimeout(async () => {
+      try {
+        setIsSuggesting(true);
+        setSuggestError("");
+        setNoResults(false);
+        const query = form.name.trim();
+        setLastQuery(query);
+        const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          setSuggestions([]);
+          setNoResults(true);
+          return;
+        }
+        const data = await res.json();
+        const list = Array.isArray(data.suggestions) ? data.suggestions : [];
+        const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+        const filtered =
+          tokens.length > 1
+            ? list.filter((item) => {
+                const haystack = `${item.name} ${item.symbol}`.toLowerCase();
+                return tokens.every((token) => haystack.includes(token));
+              })
+            : list;
+        setSuggestions(filtered);
+        setNoResults(filtered.length === 0);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setSuggestError("Autocomplete unavailable.");
+        }
+      } finally {
+        setIsSuggesting(false);
+      }
+    }, 400);
+
+    return () => {
+      controller.abort();
+      clearTimeout(handle);
+    };
+  }, [form.name]);
+
+  function handlePickSuggestion(item) {
+    setForm((prev) => ({ ...prev, name: item.name || "" }));
+    setSuggestions([]);
+    setNoResults(false);
+  }
+
+  async function handleClearCache() {
+    try {
+      await fetch("/api/autocomplete/clear", { method: "POST" });
+      setSuggestions([]);
+      setNoResults(false);
+    } catch (err) {
+      setSuggestError("Unable to clear cache.");
+    }
+  }
 
   return (
     <main className="page">
@@ -101,7 +175,7 @@
                 ))}
               </select>
             </label>
-            <label>
+            <label className="autocomplete">
               Security Name
               <input
                 type="text"
@@ -110,8 +184,39 @@
                   setForm((prev) => ({ ...prev, name: event.target.value }))
                 }
                 placeholder="e.g. SBI Bluechip Fund"
+                autoComplete="off"
               />
+              {Boolean(suggestions.length) && (
+                <div className="suggestions">
+                  {suggestions.map((item, idx) => (
+                    <button
+                      type="button"
+                      key={`${item.symbol}-${idx}`}
+                      onClick={() => handlePickSuggestion(item)}
+                    >
+                      <span className="suggest-name">{item.name}</span>
+                      <span className="suggest-meta">
+                        {item.symbol} • {item.region} • {item.currency}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!suggestions.length && isSuggesting && (
+                <div className="suggestions empty">Searching...</div>
+              )}
+              {!suggestions.length && !isSuggesting && noResults && (
+                <div className="suggestions empty">
+                  No results found for "{lastQuery}"
+                </div>
+              )}
+              {suggestError && <span className="hint">{suggestError}</span>}
             </label>
+            <div className="cache-row">
+              <button className="button ghost tiny" type="button" onClick={handleClearCache}>
+                Clear Autocomplete Cache
+              </button>
+            </div>
             <label>
               Flow
               <select

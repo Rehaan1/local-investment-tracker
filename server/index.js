@@ -1,4 +1,5 @@
 const express = require("express");
+require("dotenv").config();
 const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
@@ -7,6 +8,80 @@ const ExcelJS = require("exceljs");
 const { randomUUID } = require("crypto");
 
 const PORT = process.env.PORT || 4000;
+const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || "";
+const AUTO_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
+const autoCache = new Map();
+const inflight = new Map();
+
+function normalizeQuery(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function getCachedSuggestions(queryKey) {
+  const entry = autoCache.get(queryKey);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > AUTO_CACHE_TTL_MS) {
+    autoCache.delete(queryKey);
+    return null;
+  }
+  return entry.suggestions;
+}
+
+function setCachedSuggestions(queryKey, suggestions) {
+  autoCache.set(queryKey, { suggestions, timestamp: Date.now() });
+}
+
+async function fetchAlphaSuggestions(query) {
+  const url = new URL("https://www.alphavantage.co/query");
+  url.searchParams.set("function", "SYMBOL_SEARCH");
+  url.searchParams.set("keywords", query);
+  url.searchParams.set("apikey", ALPHA_VANTAGE_KEY);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Provider error");
+  }
+  const data = await response.json();
+  if (data.Note || data["Information"]) {
+    return { suggestions: [], rateLimited: true };
+  }
+  const matches = Array.isArray(data.bestMatches) ? data.bestMatches : [];
+  const suggestions = matches
+    .map((match) => ({
+      symbol: match["1. symbol"] || "",
+      name: match["2. name"] || "",
+      region: match["4. region"] || "",
+      currency: match["8. currency"] || "",
+      source: "AlphaVantage",
+    }))
+    .filter((item) => item.name || item.symbol);
+  return { suggestions, rateLimited: false };
+}
+
+async function fetchMfapiSuggestions(query) {
+  const url = new URL("https://api.mfapi.in/mf/search");
+  url.searchParams.set("q", query);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Provider error");
+  }
+  const data = await response.json();
+  const list = Array.isArray(data) ? data : [];
+  const suggestions = list
+    .map((item) => ({
+      symbol: item.schemeCode ? String(item.schemeCode) : "",
+      name: item.schemeName || "",
+      region: "India",
+      currency: "INR",
+      source: "MFAPI",
+    }))
+    .filter((item) => item.name || item.symbol);
+  return { suggestions };
+}
 const app = express();
 
 app.use(cors());
@@ -284,6 +359,79 @@ app.post("/api/import", upload.single("file"), async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Import failed." });
   }
+});
+
+app.get("/api/autocomplete", async (req, res) => {
+  const rawQuery = String(req.query.q || "");
+  const query = normalizeQuery(rawQuery);
+  if (!query) {
+    return res.json({ suggestions: [] });
+  }
+  if (!ALPHA_VANTAGE_KEY) {
+    return res.status(400).json({ error: "ALPHA_VANTAGE_KEY not configured." });
+  }
+
+  const cached = getCachedSuggestions(query);
+  if (cached) {
+    return res.json({ suggestions: cached, cached: true });
+  }
+
+  if (inflight.has(query)) {
+    return inflight.get(query)
+      .then((suggestions) => res.json({ suggestions, cached: true }))
+      .catch(() => res.status(500).json({ error: "Autocomplete failed." }));
+  }
+
+  const fetchPromise = (async () => {
+    let combined = [];
+    let rateLimited = false;
+
+    try {
+      const mfapi = await fetchMfapiSuggestions(query);
+      combined = mfapi.suggestions;
+    } catch (error) {
+      // ignore and fall back
+    }
+
+    if (!combined.length) {
+      try {
+        const alpha = await fetchAlphaSuggestions(query);
+        rateLimited = alpha.rateLimited;
+        combined = alpha.suggestions;
+      } catch (error) {
+        // ignore
+      }
+    }
+
+    setCachedSuggestions(query, combined);
+    return { suggestions: combined, rateLimited };
+  })();
+
+  inflight.set(query, fetchPromise);
+  try {
+    const { suggestions, rateLimited } = await fetchPromise;
+    const tokens = query.split(" ");
+    const filtered =
+      tokens.length > 1
+        ? suggestions.filter((item) => {
+            const haystack = `${item.name} ${item.symbol}`.toLowerCase();
+            return tokens.every((token) => haystack.includes(token));
+          })
+        : suggestions;
+
+    const trimmed = filtered.slice(0, 8);
+    res.json({ suggestions: trimmed, cached: false, rateLimited });
+  } catch (error) {
+    res.status(500).json({ error: "Autocomplete failed." });
+  } finally {
+    inflight.delete(query);
+  }
+});
+
+app.post("/api/autocomplete/clear", (req, res) => {
+  autoCache.clear();
+  inflight.clear();
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {
