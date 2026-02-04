@@ -256,6 +256,22 @@
   justify-content: flex-end;
 }
 
+.drive-box {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 20px rgba(15, 25, 40, 0.08);
+  display: grid;
+  gap: 12px;
+}
+
+.drive-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .form-panel input,
 .form-panel select {
   border-radius: 12px;
@@ -481,9 +497,48 @@
   border: 1px solid rgba(15, 25, 40, 0.12);
 }
 
-.drawer .form-panel label,
-.drawer-form label {
-  color: #2b3d52;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.chip.credit {
+  background: rgba(82, 113, 255, 0.15);
+  color: #2b46d8;
+}
+
+.chip.debit {
+  background: rgba(249, 65, 68, 0.2);
+  color: #b61b1f;
+}
+
+.amount {
+  font-weight: 600;
+}
+
+.amount.negative {
+  color: #b61b1f;
+}
+
+.amount.positive {
+  color: #146b3a;
+}
+
+.error {
+  margin-top: 10px;
+  color: #b61b1f;
+  font-weight: 600;
+}
+
+.muted {
+  color: #60708a;
+  font-size: 0.9rem;
 }
 
 @keyframes rise {

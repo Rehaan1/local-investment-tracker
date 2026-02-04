@@ -16,6 +16,11 @@ function Ledger({
   currency,
   error,
   isLoading,
+  driveStatus,
+  driveMessage,
+  isBackingUp,
+  onConnectDrive,
+  onDriveBackup,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -169,6 +174,33 @@ function Ledger({
                 Apply Import
               </button>
             </div>
+          </div>
+          <div className="drive-box">
+            <div>
+              <p className="eyebrow">Google Drive Backup</p>
+              <p className="muted">
+                {driveStatus.configured
+                  ? driveStatus.connected
+                    ? "Connected"
+                    : "Not connected"
+                  : "Not configured"}
+              </p>
+            </div>
+            <div className="drive-actions">
+              {!driveStatus.connected && driveStatus.configured && (
+                <button className="button ghost tiny" onClick={onConnectDrive}>
+                  Connect Drive
+                </button>
+              )}
+              <button
+                className="button primary tiny"
+                onClick={onDriveBackup}
+                disabled={!driveStatus.connected || isBackingUp}
+              >
+                {isBackingUp ? "Backing Up..." : "Backup Now"}
+              </button>
+            </div>
+            {driveMessage && <p className="hint">{driveMessage}</p>}
           </div>
         </div>
         <div className="hero-card">

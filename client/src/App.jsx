@@ -1,5 +1,5 @@
 ﻿import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import Ledger from "./pages/Ledger";
 import "./App.css";
@@ -10,6 +10,7 @@ const DEFAULT_TYPES = [
   "Bonds",
   "Stocks",
   "REITs",
+  "Fixed Deposit",
   "Gold",
   "Crypto",
   "Other",
@@ -19,6 +20,8 @@ const CATEGORY_OPTIONS = [
   "Large Cap",
   "Mid Cap",
   "Small Cap",
+  "Smallcase",
+  "RSU",
   "Flexi Cap",
   "Multi Cap",
   "Debt",
@@ -47,6 +50,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [importFile, setImportFile] = useState(null);
+  const [driveStatus, setDriveStatus] = useState({ configured: false, connected: false });
+  const [driveMessage, setDriveMessage] = useState("");
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const loadAttemptsRef = useRef(0);
 
   const currency = useMemo(
     () => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }),
@@ -81,15 +88,40 @@ function App() {
       const summaryData = await summaryRes.json();
       setInvestments(listData);
       setSummary(summaryData);
+      loadAttemptsRef.current = 0;
     } catch (err) {
-      setError(err.message || "Something went wrong.");
+      const message = err?.message || "Something went wrong.";
+      const attempts = loadAttemptsRef.current;
+      if (attempts < 5 && message.toLowerCase().includes("failed to fetch")) {
+        loadAttemptsRef.current += 1;
+        setError("Waiting for local server...");
+        const delay = 700 * Math.pow(2, attempts);
+        setTimeout(fetchAll, delay);
+        return;
+      }
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   }
 
+  async function fetchDriveStatus() {
+    try {
+      const res = await fetch("/api/drive/status");
+      if (!res.ok) return;
+      const data = await res.json();
+      setDriveStatus({
+        configured: Boolean(data.configured),
+        connected: Boolean(data.connected),
+      });
+    } catch (err) {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     fetchAll();
+    fetchDriveStatus();
   }, []);
 
   // Create a new ledger entry.
@@ -173,6 +205,46 @@ function App() {
     window.location.href = "/api/export";
   }
 
+  async function handleConnectDrive() {
+    try {
+      setDriveMessage("");
+      const res = await fetch("/api/drive/auth-url");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Unable to connect Google Drive.");
+      }
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, "_blank", "width=520,height=640");
+      }
+    } catch (err) {
+      setDriveMessage(err.message || "Unable to connect Google Drive.");
+    }
+  }
+
+  async function handleDriveBackup() {
+    try {
+      setDriveMessage("");
+      setIsBackingUp(true);
+      const res = await fetch("/api/drive/backup", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Backup failed.");
+      }
+      const data = await res.json();
+      setDriveMessage(
+        data.webViewLink
+          ? "Backup complete. File updated in Google Drive."
+          : "Backup complete."
+      );
+    } catch (err) {
+      setDriveMessage(err.message || "Backup failed.");
+    } finally {
+      setIsBackingUp(false);
+      fetchDriveStatus();
+    }
+  }
+
   return (
     <BrowserRouter>
       <div className="app">
@@ -229,6 +301,11 @@ function App() {
                 currency={currency}
                 error={error}
                 isLoading={isLoading}
+                driveStatus={driveStatus}
+                driveMessage={driveMessage}
+                isBackingUp={isBackingUp}
+                onConnectDrive={handleConnectDrive}
+                onDriveBackup={handleDriveBackup}
               />
             }
           />
