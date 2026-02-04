@@ -21,7 +21,14 @@ if exist client (
 echo Launching dev servers...
 start "Investment Atlas" cmd /k "npm run dev"
 
-echo Opening browser...
-start "" http://localhost:5173
+echo Waiting for server...
+powershell -NoProfile -Command "for ($i=0; $i -lt 40; $i++) { try { $c = New-Object Net.Sockets.TcpClient('127.0.0.1',4000); $c.Close(); exit 0 } catch { Start-Sleep -Milliseconds 500 } } exit 1"
+
+if %errorlevel%==0 (
+  echo Opening browser...
+  start "" http://127.0.0.1:5173
+) else (
+  echo Server did not start in time. Open http://127.0.0.1:5173 manually.
+)
 
 endlocal

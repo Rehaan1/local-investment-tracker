@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
 const multer = require("multer");
@@ -6,13 +6,42 @@ const fs = require("fs");
 const path = require("path");
 const ExcelJS = require("exceljs");
 const { randomUUID } = require("crypto");
+const { google } = require("googleapis");
 
 const PORT = process.env.PORT || 4000;
 const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || "";
-// Autocomplete cache to reduce external API calls.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const GOOGLE_REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI || "http://localhost:4000/api/drive/oauth2callback";
 const AUTO_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
 const autoCache = new Map();
 const inflight = new Map();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json({ limit: "2mb" }));
+
+const DATA_DIR = path.join(__dirname, "data");
+const FILE_PATH = path.join(DATA_DIR, "investments.xlsx");
+const UPLOAD_DIR = path.join(__dirname, "uploads");
+const DRIVE_TOKEN_PATH = path.join(__dirname, ".drive_token.json");
+const DRIVE_FOLDER_NAME = "Investment Atlas";
+const DRIVE_FILE_NAME = "investments.xlsx";
+const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"];
+const SHEET_NAME = "Investments";
+const HEADERS = [
+  "id",
+  "type",
+  "category",
+  "name",
+  "direction",
+  "amount",
+  "date",
+  "notes",
+  "createdAt",
+];
 
 // Normalize query strings to improve cache hits and filtering.
 function normalizeQuery(value) {
@@ -34,6 +63,102 @@ function getCachedSuggestions(queryKey) {
 
 function setCachedSuggestions(queryKey, suggestions) {
   autoCache.set(queryKey, { suggestions, timestamp: Date.now() });
+}
+
+function isDriveConfigured() {
+  return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REDIRECT_URI);
+}
+
+function getOAuthClient() {
+  return new google.auth.OAuth2(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI
+  );
+}
+
+function loadDriveToken(oAuth2Client) {
+  if (!fs.existsSync(DRIVE_TOKEN_PATH)) {
+    return false;
+  }
+  try {
+    const token = JSON.parse(fs.readFileSync(DRIVE_TOKEN_PATH, "utf-8"));
+    oAuth2Client.setCredentials(token);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function saveDriveToken(token) {
+  fs.writeFileSync(DRIVE_TOKEN_PATH, JSON.stringify(token, null, 2));
+}
+
+async function getDriveClient() {
+  if (!isDriveConfigured()) {
+    const error = new Error("Google Drive not configured.");
+    error.code = "drive_not_configured";
+    throw error;
+  }
+  const oAuth2Client = getOAuthClient();
+  const hasToken = loadDriveToken(oAuth2Client);
+  if (!hasToken) {
+    const error = new Error("Google Drive not connected.");
+    error.code = "drive_not_connected";
+    throw error;
+  }
+  return google.drive({ version: "v3", auth: oAuth2Client });
+}
+
+async function ensureDriveFolder(drive) {
+  const query = [
+    "mimeType='application/vnd.google-apps.folder'",
+    `name='${DRIVE_FOLDER_NAME.replace(/'/g, "\\'")}'`,
+    "trashed=false",
+    "'root' in parents",
+  ].join(" and ");
+
+  const list = await drive.files.list({
+    q: query,
+    fields: "files(id, name)",
+    spaces: "drive",
+    pageSize: 1,
+  });
+
+  if (list.data.files && list.data.files.length) {
+    return list.data.files[0].id;
+  }
+
+  const created = await drive.files.create({
+    requestBody: {
+      name: DRIVE_FOLDER_NAME,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: ["root"],
+    },
+    fields: "id",
+  });
+
+  return created.data.id;
+}
+
+async function findDriveFile(drive, folderId) {
+  const query = [
+    `name='${DRIVE_FILE_NAME.replace(/'/g, "\\'")}'`,
+    `'${folderId}' in parents`,
+    "trashed=false",
+  ].join(" and ");
+
+  const list = await drive.files.list({
+    q: query,
+    fields: "files(id, name, modifiedTime)",
+    spaces: "drive",
+    pageSize: 1,
+  });
+
+  if (list.data.files && list.data.files.length) {
+    return list.data.files[0];
+  }
+  return null;
 }
 
 // Alpha Vantage search (global equities).
@@ -86,26 +211,6 @@ async function fetchMfapiSuggestions(query) {
     .filter((item) => item.name || item.symbol);
   return { suggestions };
 }
-const app = express();
-
-app.use(cors());
-app.use(express.json({ limit: "2mb" }));
-
-const DATA_DIR = path.join(__dirname, "data");
-const FILE_PATH = path.join(DATA_DIR, "investments.xlsx");
-const UPLOAD_DIR = path.join(__dirname, "uploads");
-const SHEET_NAME = "Investments";
-const HEADERS = [
-  "id",
-  "type",
-  "category",
-  "name",
-  "direction",
-  "amount",
-  "date",
-  "notes",
-  "createdAt",
-];
 
 // Ensure the data and upload directories exist and the Excel ledger is initialized.
 async function ensureDataFile() {
@@ -189,12 +294,12 @@ async function readInvestments() {
   const rows = sheetToRows(sheet);
   return rows
     .map((row) => ({
-    id: String(row.id || "").trim(),
-    type: String(row.type || "").trim(),
-    category: String(row.category || "").trim(),
-    name: String(row.name || "").trim(),
-    direction: String(row.direction || "credit").trim() || "credit",
-    amount: Number(row.amount || 0),
+      id: String(row.id || "").trim(),
+      type: String(row.type || "").trim(),
+      category: String(row.category || "").trim(),
+      name: String(row.name || "").trim(),
+      direction: String(row.direction || "credit").trim() || "credit",
+      amount: Number(row.amount || 0),
       date: String(row.date || "").trim(),
       notes: String(row.notes || "").trim(),
       createdAt: String(row.createdAt || "").trim(),
@@ -387,8 +492,9 @@ app.get("/api/autocomplete", async (req, res) => {
   }
 
   if (inflight.has(query)) {
-    return inflight.get(query)
-      .then((suggestions) => res.json({ suggestions, cached: true }))
+    return inflight
+      .get(query)
+      .then((result) => res.json({ suggestions: result.suggestions, cached: true }))
       .catch(() => res.status(500).json({ error: "Autocomplete failed." }));
   }
 
@@ -442,6 +548,95 @@ app.post("/api/autocomplete/clear", (req, res) => {
   autoCache.clear();
   inflight.clear();
   res.json({ ok: true });
+});
+
+app.get("/api/drive/status", (req, res) => {
+  const configured = isDriveConfigured();
+  const connected = configured && fs.existsSync(DRIVE_TOKEN_PATH);
+  res.json({ configured, connected });
+});
+
+app.get("/api/drive/auth-url", (req, res) => {
+  if (!isDriveConfigured()) {
+    return res.status(400).json({ error: "Google Drive not configured." });
+  }
+  const oAuth2Client = getOAuthClient();
+  const url = oAuth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: DRIVE_SCOPES,
+  });
+  res.json({ url });
+});
+
+app.get("/api/drive/oauth2callback", async (req, res) => {
+  if (!isDriveConfigured()) {
+    return res.status(400).send("Google Drive not configured.");
+  }
+  const code = req.query.code;
+  if (!code) {
+    return res.status(400).send("Missing code.");
+  }
+  try {
+    const oAuth2Client = getOAuthClient();
+    const { tokens } = await oAuth2Client.getToken(code);
+    saveDriveToken(tokens);
+    res.send(
+      "<html><body style='font-family:Arial; padding:40px;'>" +
+        "<h2>Google Drive connected.</h2>" +
+        "<p>You can close this tab and return to Investment Atlas.</p>" +
+        "</body></html>"
+    );
+  } catch (error) {
+    res.status(500).send("Failed to authenticate with Google Drive.");
+  }
+});
+
+app.post("/api/drive/backup", async (req, res) => {
+  try {
+    await ensureDataFile();
+    const drive = await getDriveClient();
+    const folderId = await ensureDriveFolder(drive);
+    const existing = await findDriveFile(drive, folderId);
+    const media = {
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      body: fs.createReadStream(FILE_PATH),
+    };
+
+    let result;
+    if (existing) {
+      result = await drive.files.update({
+        fileId: existing.id,
+        media,
+        requestBody: { name: DRIVE_FILE_NAME },
+        fields: "id, modifiedTime, webViewLink",
+      });
+    } else {
+      result = await drive.files.create({
+        requestBody: {
+          name: DRIVE_FILE_NAME,
+          parents: [folderId],
+        },
+        media,
+        fields: "id, webViewLink",
+      });
+    }
+
+    res.json({
+      ok: true,
+      fileId: result.data.id,
+      webViewLink: result.data.webViewLink || null,
+    });
+  } catch (error) {
+    if (error.code === "drive_not_configured") {
+      return res.status(400).json({ error: "Google Drive not configured." });
+    }
+    if (error.code === "drive_not_connected") {
+      return res.status(401).json({ error: "Google Drive not connected." });
+    }
+    res.status(500).json({ error: "Backup failed." });
+  }
 });
 
 app.listen(PORT, () => {

@@ -21,6 +21,11 @@ client/dist/
 # Server data
 server/data/investments.xlsx
 server/uploads/
+server/.drive_token.json
 
 # Env
 .env
+.env.*
+
+# Credentials
+server/.credentials.json

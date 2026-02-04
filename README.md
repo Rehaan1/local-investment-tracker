@@ -45,6 +45,22 @@ Results are cached for a few hours to reduce API calls. We also fall back to a
 secondary free API for Indian mutual funds when Alpha Vantage is rate-limited
 or returns no matches.
 
+## Google Drive Backup
+
+Click "Connect Drive" once to authorize, then use "Backup Now" to upload the
+local Excel file to a Google Drive folder named `Investment Atlas`.
+
+1. Create OAuth credentials in Google Cloud (Desktop or Web App).
+2. Add to `server/.env`:
+
+```
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_REDIRECT_URI=http://localhost:4000/api/drive/oauth2callback
+```
+
+The app stores tokens at `server/.drive_token.json` (ignored by git).
+
 ## Data File
 
 Your ledger is stored locally at:
