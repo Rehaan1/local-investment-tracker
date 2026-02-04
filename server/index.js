@@ -16,7 +16,17 @@ const DATA_DIR = path.join(__dirname, "data");
 const FILE_PATH = path.join(DATA_DIR, "investments.xlsx");
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 const SHEET_NAME = "Investments";
-const HEADERS = ["id", "type", "name", "direction", "amount", "date", "notes", "createdAt"];
+const HEADERS = [
+  "id",
+  "type",
+  "category",
+  "name",
+  "direction",
+  "amount",
+  "date",
+  "notes",
+  "createdAt",
+];
 
 async function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -58,17 +68,24 @@ function cellToNumber(value) {
 function sheetToRows(sheet) {
   if (!sheet) return [];
   const headerRow = sheet.getRow(1);
-  const headerValues = headerRow.values.slice(1).map((value) => String(value || "").trim());
+  const headerValues = headerRow.values
+    .slice(1)
+    .map((value) => String(value || "").trim());
   const headers = headerValues.length >= 2 ? headerValues : HEADERS;
 
   const rows = [];
   for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex += 1) {
     const row = sheet.getRow(rowIndex);
     const record = {};
-    HEADERS.forEach((header, idx) => {
-      const headerIndex = headers.findIndex((h) => h.toLowerCase() === header.toLowerCase());
-      const cellIndex = headerIndex !== -1 ? headerIndex + 1 : idx + 1;
-      const cellValue = row.getCell(cellIndex).value;
+    HEADERS.forEach((header) => {
+      const headerIndex = headers.findIndex(
+        (h) => h.toLowerCase() === header.toLowerCase()
+      );
+      if (headerIndex === -1) {
+        record[header] = header === "amount" ? 0 : "";
+        return;
+      }
+      const cellValue = row.getCell(headerIndex + 1).value;
       if (header === "amount") {
         record[header] = cellToNumber(cellValue);
       } else {
@@ -89,11 +106,12 @@ async function readInvestments() {
   const rows = sheetToRows(sheet);
   return rows
     .map((row) => ({
-      id: String(row.id || "").trim(),
-      type: String(row.type || "").trim(),
-      name: String(row.name || "").trim(),
-      direction: String(row.direction || "credit").trim() || "credit",
-      amount: Number(row.amount || 0),
+    id: String(row.id || "").trim(),
+    type: String(row.type || "").trim(),
+    category: String(row.category || "").trim(),
+    name: String(row.name || "").trim(),
+    direction: String(row.direction || "credit").trim() || "credit",
+    amount: Number(row.amount || 0),
       date: String(row.date || "").trim(),
       notes: String(row.notes || "").trim(),
       createdAt: String(row.createdAt || "").trim(),
@@ -116,6 +134,7 @@ function normalizeInvestment(input) {
   return {
     id: input.id || randomUUID(),
     type: String(input.type || "").trim(),
+    category: String(input.category || "").trim(),
     name: String(input.name || "").trim(),
     direction: direction === "debit" ? "debit" : "credit",
     amount: Number(input.amount || 0),
@@ -136,7 +155,7 @@ app.get("/api/investments", async (req, res) => {
 
 app.post("/api/investments", async (req, res) => {
   try {
-    const { type, name, direction, amount, date, notes } = req.body || {};
+    const { type, category, name, direction, amount, date, notes } = req.body || {};
     const numericAmount = Number(amount);
     if (!type || !date || !Number.isFinite(numericAmount)) {
       return res.status(400).json({ error: "type, amount, and date are required." });
@@ -144,6 +163,7 @@ app.post("/api/investments", async (req, res) => {
     const investments = await readInvestments();
     const newItem = normalizeInvestment({
       type,
+      category,
       name,
       direction,
       amount: numericAmount,
@@ -170,6 +190,7 @@ app.put("/api/investments/:id", async (req, res) => {
       ...normalizeInvestment({
         id: investments[idx].id,
         type: req.body?.type ?? investments[idx].type,
+        category: req.body?.category ?? investments[idx].category,
         name: req.body?.name ?? investments[idx].name,
         direction: req.body?.direction ?? investments[idx].direction,
         amount: req.body?.amount ?? investments[idx].amount,
@@ -204,6 +225,7 @@ app.get("/api/summary", async (req, res) => {
   try {
     const investments = await readInvestments();
     const byType = {};
+    const byCategory = {};
     const byMonth = {};
 
     investments.forEach((item) => {
@@ -214,11 +236,14 @@ app.get("/api/summary", async (req, res) => {
       const typeKey = item.type || "Uncategorized";
       byType[typeKey] = (byType[typeKey] || 0) + signedAmount;
 
+      const categoryKey = item.category || "Unspecified";
+      byCategory[categoryKey] = (byCategory[categoryKey] || 0) + signedAmount;
+
       const monthKey = item.date ? item.date.slice(0, 7) : "Unknown";
       byMonth[monthKey] = (byMonth[monthKey] || 0) + signedAmount;
     });
 
-    res.json({ byType, byMonth });
+    res.json({ byType, byCategory, byMonth });
   } catch (error) {
     res.status(500).json({ error: "Failed to load summary." });
   }
@@ -244,6 +269,7 @@ app.post("/api/import", upload.single("file"), async (req, res) => {
     const filtered = rows.filter((row) => {
       const hasData =
         String(row.type || "").trim() ||
+        String(row.category || "").trim() ||
         String(row.name || "").trim() ||
         String(row.amount || "").trim() ||
         String(row.date || "").trim() ||
