@@ -196,6 +196,10 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.dashboard-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
 .panel {
   background: rgba(255, 255, 255, 0.85);
   border-radius: 22px;
@@ -208,6 +212,10 @@
 .panel h3 {
   margin-top: 0;
   font-size: 1.2rem;
+}
+
+.filter-panel {
+  padding: 18px 20px;
 }
 
 .insight-panel {
@@ -236,6 +244,15 @@
 .insight-row span {
   color: #2b3d52;
   font-size: 0.9rem;
+}
+
+.chart-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.chart-card {
+  grid-column: span 4;
 }
 
 .form-panel form {
@@ -626,6 +643,30 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@media (max-width: 1200px) {
+  .filter-bar {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .filter-bar .button {
+    justify-self: start;
+  }
+
+  .chart-card {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .chart-card {
+    grid-column: span 6;
   }
 }
 
