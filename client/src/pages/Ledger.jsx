@@ -206,55 +206,6 @@ function Ledger({
             Add transactions, export for backup, or import if you ever need to
             restore your data.
           </p>
-          <div className="cta-row">
-            <button className="button primary" onClick={handleExport}>
-              Export Excel
-            </button>
-            <div className="import-group">
-              <label className="file-button">
-                Import Excel
-                <input
-                  type="file"
-                  accept=".xlsx"
-                  onChange={(event) => setImportFile(event.target.files?.[0])}
-                />
-              </label>
-              <button
-                className="button ghost"
-                onClick={handleImport}
-                disabled={!importFile}
-              >
-                Apply Import
-              </button>
-            </div>
-          </div>
-          <div className="drive-box">
-            <div>
-              <p className="eyebrow">Google Drive Backup</p>
-              <p className="muted">
-                {driveStatus.configured
-                  ? driveStatus.connected
-                    ? "Connected"
-                    : "Not connected"
-                  : "Not configured"}
-              </p>
-            </div>
-            <div className="drive-actions">
-              {!driveStatus.connected && driveStatus.configured && (
-                <button className="button ghost tiny" onClick={onConnectDrive}>
-                  Connect Drive
-                </button>
-              )}
-              <button
-                className="button primary tiny"
-                onClick={onDriveBackup}
-                disabled={!driveStatus.connected || isBackingUp}
-              >
-                {isBackingUp ? "Backing Up..." : "Backup Now"}
-              </button>
-            </div>
-            {driveMessage && <p className="hint">{driveMessage}</p>}
-          </div>
         </div>
         <div className="hero-card">
           <div className="hero-metric">
@@ -272,7 +223,60 @@ function Ledger({
         </div>
       </section>
 
-      <section className="grid">
+      <section className="grid ledger-grid">
+        <section className="panel action-panel">
+          <h3>Quick Actions</h3>
+          <div className="cta-row">
+            <button className="button primary" onClick={handleExport}>
+              Export Excel
+            </button>
+            <label className="file-button">
+              Import Excel
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(event) => setImportFile(event.target.files?.[0])}
+              />
+            </label>
+            <button
+              className="button ghost"
+              onClick={handleImport}
+              disabled={!importFile}
+            >
+              Apply Import
+            </button>
+          </div>
+          <p className="muted">Use import only if you need to restore a backup.</p>
+        </section>
+
+        <section className="panel drive-panel">
+          <div>
+            <p className="eyebrow">Google Drive Backup</p>
+            <p className="muted">
+              {driveStatus.configured
+                ? driveStatus.connected
+                  ? "Connected"
+                  : "Not connected"
+                : "Not configured"}
+            </p>
+          </div>
+          <div className="drive-actions">
+            {!driveStatus.connected && driveStatus.configured && (
+              <button className="button ghost tiny" onClick={onConnectDrive}>
+                Connect Drive
+              </button>
+            )}
+            <button
+              className="button primary tiny"
+              onClick={onDriveBackup}
+              disabled={!driveStatus.connected || isBackingUp}
+            >
+              {isBackingUp ? "Backing Up..." : "Backup Now"}
+            </button>
+          </div>
+          {driveMessage && <p className="hint">{driveMessage}</p>}
+        </section>
+
         <section className="panel form-panel">
           <h3>Add Investment</h3>
           <form onSubmit={handleAdd}>
@@ -487,15 +491,17 @@ function Ledger({
                 }
               />
             </div>
-            <button
-              className="button ghost tiny"
-              type="button"
-              onClick={() =>
-                setFilters({ type: "", category: "", flow: "", text: "", from: "", to: "" })
-              }
-            >
-              Clear Filters
-            </button>
+            <div className="filter-actions">
+              <button
+                className="button ghost tiny"
+                type="button"
+                onClick={() =>
+                  setFilters({ type: "", category: "", flow: "", text: "", from: "", to: "" })
+                }
+              >
+                Clear Filters
+              </button>
+            </div>
           </div>
           <div className="ledger-table">
             <div className="ledger-row ledger-head">
