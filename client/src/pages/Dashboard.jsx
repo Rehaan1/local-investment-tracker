@@ -23,6 +23,8 @@ ChartJS.register(
   LineElement
 );
 
+const TOP_OPTIONS = [1, 3, 5, 7, 10];
+
 function Dashboard({ investments, summary, total, currency, isLoading }) {
   const [filters, setFilters] = useState({
     type: "",
@@ -31,6 +33,7 @@ function Dashboard({ investments, summary, total, currency, isLoading }) {
     from: "",
     to: "",
   });
+  const [topN, setTopN] = useState(1);
 
   const filteredInvestments = useMemo(() => {
     return investments.filter((item) => {
@@ -110,19 +113,19 @@ function Dashboard({ investments, summary, total, currency, isLoading }) {
       bySecurity.set(securityKey, (bySecurity.get(securityKey) || 0) + signed);
     });
 
-    const topType = [...byType.entries()].sort((a, b) => b[1] - a[1])[0];
-    const topCategory = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
-    const topSecurity = [...bySecurity.entries()].sort((a, b) => b[1] - a[1])[0];
+    const sortedTypes = [...byType.entries()].sort((a, b) => b[1] - a[1]);
+    const sortedCategories = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
+    const sortedSecurities = [...bySecurity.entries()].sort((a, b) => b[1] - a[1]);
 
     return {
       credits,
       debits,
       avgMonthly,
-      topType,
-      topCategory,
-      topSecurity,
+      topTypes: sortedTypes.slice(0, topN),
+      topCategories: sortedCategories.slice(0, topN),
+      topSecurities: sortedSecurities.slice(0, topN),
     };
-  }, [filteredInvestments]);
+  }, [filteredInvestments, topN]);
 
   const typeLabels = Object.keys(derivedSummary.byType || {});
   const typeValuesRaw = typeLabels.map((key) => derivedSummary.byType[key]);
@@ -372,26 +375,72 @@ function Dashboard({ investments, summary, total, currency, isLoading }) {
 
       <section className="grid dashboard-grid">
         <div className="panel insight-panel">
-          <h3>Top Exposures</h3>
+          <div className="panel-header">
+            <div>
+              <h3>Top Exposures</h3>
+              <p className="muted">Showing top {topN} across categories.</p>
+            </div>
+            <div className="top-select">
+              <span>Top N</span>
+              <div className="pill-select">
+                {TOP_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={option === topN ? "pill active" : "pill"}
+                    onClick={() => setTopN(option)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="insight-row">
             <div>
-              <p>Top Type</p>
-              <strong>{stats.topType ? stats.topType[0] : "—"}</strong>
-              <span>{stats.topType ? currency.format(stats.topType[1]) : ""}</span>
+              <p>Top Types</p>
+              {stats.topTypes.length ? (
+                <ul className="exposure-list">
+                  {stats.topTypes.map(([label, value]) => (
+                    <li key={label}>
+                      <span>{label}</span>
+                      <strong>{currency.format(value)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="muted">—</span>
+              )}
             </div>
             <div>
-              <p>Top Category</p>
-              <strong>{stats.topCategory ? stats.topCategory[0] : "—"}</strong>
-              <span>
-                {stats.topCategory ? currency.format(stats.topCategory[1]) : ""}
-              </span>
+              <p>Top Categories</p>
+              {stats.topCategories.length ? (
+                <ul className="exposure-list">
+                  {stats.topCategories.map(([label, value]) => (
+                    <li key={label}>
+                      <span>{label}</span>
+                      <strong>{currency.format(value)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="muted">—</span>
+              )}
             </div>
             <div>
-              <p>Top Security</p>
-              <strong>{stats.topSecurity ? stats.topSecurity[0] : "—"}</strong>
-              <span>
-                {stats.topSecurity ? currency.format(stats.topSecurity[1]) : ""}
-              </span>
+              <p>Top Securities</p>
+              {stats.topSecurities.length ? (
+                <ul className="exposure-list">
+                  {stats.topSecurities.map(([label, value]) => (
+                    <li key={label}>
+                      <span>{label}</span>
+                      <strong>{currency.format(value)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="muted">—</span>
+              )}
             </div>
           </div>
           {isLoading && <p className="muted">Updating insights...</p>}
