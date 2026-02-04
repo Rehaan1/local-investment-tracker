@@ -9,10 +9,12 @@ const { randomUUID } = require("crypto");
 
 const PORT = process.env.PORT || 4000;
 const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || "";
+// Autocomplete cache to reduce external API calls.
 const AUTO_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
 const autoCache = new Map();
 const inflight = new Map();
 
+// Normalize query strings to improve cache hits and filtering.
 function normalizeQuery(value) {
   return String(value || "")
     .trim()
@@ -34,6 +36,7 @@ function setCachedSuggestions(queryKey, suggestions) {
   autoCache.set(queryKey, { suggestions, timestamp: Date.now() });
 }
 
+// Alpha Vantage search (global equities).
 async function fetchAlphaSuggestions(query) {
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("function", "SYMBOL_SEARCH");
@@ -61,6 +64,7 @@ async function fetchAlphaSuggestions(query) {
   return { suggestions, rateLimited: false };
 }
 
+// MFAPI search (India mutual funds).
 async function fetchMfapiSuggestions(query) {
   const url = new URL("https://api.mfapi.in/mf/search");
   url.searchParams.set("q", query);
@@ -103,6 +107,7 @@ const HEADERS = [
   "createdAt",
 ];
 
+// Ensure the data and upload directories exist and the Excel ledger is initialized.
 async function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -118,6 +123,7 @@ async function ensureDataFile() {
   }
 }
 
+// Normalize ExcelJS cell values to strings.
 function cellToString(value) {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -129,6 +135,7 @@ function cellToString(value) {
   return String(value);
 }
 
+// Normalize ExcelJS cell values to numbers.
 function cellToNumber(value) {
   if (value == null) return 0;
   if (typeof value === "number") return value;
@@ -140,6 +147,7 @@ function cellToNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Convert a worksheet to an array of objects using the header row.
 function sheetToRows(sheet) {
   if (!sheet) return [];
   const headerRow = sheet.getRow(1);
@@ -204,6 +212,7 @@ async function writeInvestments(investments) {
   await workbook.xlsx.writeFile(FILE_PATH);
 }
 
+// Normalize incoming entries to the persisted schema.
 function normalizeInvestment(input) {
   const direction = String(input.direction || "credit").trim().toLowerCase();
   return {
@@ -296,6 +305,7 @@ app.delete("/api/investments/:id", async (req, res) => {
   }
 });
 
+// Summary used by dashboard charts.
 app.get("/api/summary", async (req, res) => {
   try {
     const investments = await readInvestments();

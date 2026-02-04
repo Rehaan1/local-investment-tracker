@@ -29,6 +29,7 @@ function Ledger({
     b.date.localeCompare(a.date)
   );
 
+  // Debounced autocomplete requests to reduce API calls.
   useEffect(() => {
     if (!form.name || form.name.trim().length < 2) {
       setSuggestions([]);
@@ -85,6 +86,7 @@ function Ledger({
     setNoResults(false);
   }
 
+  // Clear server-side autocomplete cache.
   async function handleClearCache() {
     try {
       await fetch("/api/autocomplete/clear", { method: "POST" });
@@ -95,6 +97,7 @@ function Ledger({
     }
   }
 
+  // Open the edit drawer with a copy of the entry.
   function openEdit(item) {
     setEditingItem(item);
     setEditForm({
@@ -113,6 +116,7 @@ function Ledger({
     setEditForm(null);
   }
 
+  // Persist edit drawer changes.
   async function submitEdit(event) {
     event.preventDefault();
     if (!editingItem || !editForm) return;

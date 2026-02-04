@@ -1,4 +1,4 @@
-# Investment Atlas
+﻿# Investment Atlas
 
 A local-first investment tracker with Excel storage, a Node.js API, and a React dashboard with charts.
 
@@ -58,3 +58,7 @@ Use Export/Import in the UI for backups or recovery.
 - Excel import will replace the current ledger.
 - Amounts are displayed in INR.
 - Debit entries reduce totals and charts.
+
+## Developer Docs
+
+See `DOCS.md` for maintenance notes and architecture details.

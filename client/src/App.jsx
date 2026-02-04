@@ -66,6 +66,7 @@ function App() {
     [investments]
   );
 
+  // Fetch base data and dashboard summary in one round trip.
   async function fetchAll() {
     try {
       setIsLoading(true);
@@ -91,6 +92,7 @@ function App() {
     fetchAll();
   }, []);
 
+  // Create a new ledger entry.
   async function handleAdd(event) {
     event.preventDefault();
     try {
@@ -131,6 +133,7 @@ function App() {
     }
   }
 
+  // Update an existing ledger entry from the edit drawer.
   async function handleUpdate(id, updates) {
     try {
       setError("");
@@ -149,6 +152,7 @@ function App() {
     }
   }
 
+  // Replace the ledger by importing a full Excel file.
   async function handleImport() {
     if (!importFile) return;
     try {
@@ -164,6 +168,7 @@ function App() {
     }
   }
 
+  // Download the current Excel ledger.
   function handleExport() {
     window.location.href = "/api/export";
   }
