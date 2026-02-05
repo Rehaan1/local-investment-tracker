@@ -53,6 +53,7 @@ function App() {
   const [driveStatus, setDriveStatus] = useState({ configured: false, connected: false });
   const [driveMessage, setDriveMessage] = useState("");
   const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isImportingFromDrive, setIsImportingFromDrive] = useState(false);
   const loadAttemptsRef = useRef(0);
 
   const currency = useMemo(
@@ -245,6 +246,32 @@ function App() {
     }
   }
 
+  async function handleDriveImport() {
+    const shouldImport = window.confirm(
+      "Importing from Google Drive will replace your local ledger. Continue?"
+    );
+    if (!shouldImport) return;
+
+    try {
+      setDriveMessage("");
+      setIsImportingFromDrive(true);
+      const res = await fetch("/api/drive/import", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Import failed.");
+      }
+      const data = await res.json();
+      const when = data.modifiedTime ? ` (Drive file updated ${data.modifiedTime})` : "";
+      setDriveMessage(`Import complete.${when}`);
+      await fetchAll();
+    } catch (err) {
+      setDriveMessage(err.message || "Import failed.");
+    } finally {
+      setIsImportingFromDrive(false);
+      fetchDriveStatus();
+    }
+  }
+
   return (
     <BrowserRouter>
       <div className="app">
@@ -304,8 +331,10 @@ function App() {
                 driveStatus={driveStatus}
                 driveMessage={driveMessage}
                 isBackingUp={isBackingUp}
+                isImportingFromDrive={isImportingFromDrive}
                 onConnectDrive={handleConnectDrive}
                 onDriveBackup={handleDriveBackup}
+                onDriveImport={handleDriveImport}
               />
             }
           />

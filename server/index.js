@@ -161,6 +161,42 @@ async function findDriveFile(drive, folderId) {
   return null;
 }
 
+async function downloadDriveFile(drive, fileId, destinationPath) {
+  const response = await drive.files.get(
+    { fileId, alt: "media" },
+    { responseType: "stream" }
+  );
+
+  await new Promise((resolve, reject) => {
+    const tempPath = `${destinationPath}.tmp`;
+    const dest = fs.createWriteStream(tempPath);
+
+    const cleanup = (err) => {
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      } catch (cleanupError) {
+        // ignore cleanup errors
+      }
+      reject(err);
+    };
+
+    response.data.on("error", cleanup);
+    dest.on("error", cleanup);
+    dest.on("finish", () => {
+      try {
+        fs.renameSync(tempPath, destinationPath);
+        resolve();
+      } catch (err) {
+        cleanup(err);
+      }
+    });
+
+    response.data.pipe(dest);
+  });
+}
+
 // Alpha Vantage search (global equities).
 async function fetchAlphaSuggestions(query) {
   const url = new URL("https://www.alphavantage.co/query");
@@ -636,6 +672,30 @@ app.post("/api/drive/backup", async (req, res) => {
       return res.status(401).json({ error: "Google Drive not connected." });
     }
     res.status(500).json({ error: "Backup failed." });
+  }
+});
+
+app.post("/api/drive/import", async (req, res) => {
+  try {
+    const drive = await getDriveClient();
+    const folderId = await ensureDriveFolder(drive);
+    const existing = await findDriveFile(drive, folderId);
+    if (!existing) {
+      return res.status(404).json({ error: "No backup found in Google Drive." });
+    }
+
+    await ensureDataFile();
+    await downloadDriveFile(drive, existing.id, FILE_PATH);
+
+    res.json({ ok: true, modifiedTime: existing.modifiedTime || null });
+  } catch (error) {
+    if (error.code === "drive_not_configured") {
+      return res.status(400).json({ error: "Google Drive not configured." });
+    }
+    if (error.code === "drive_not_connected") {
+      return res.status(401).json({ error: "Google Drive not connected." });
+    }
+    res.status(500).json({ error: "Import failed." });
   }
 });
 
