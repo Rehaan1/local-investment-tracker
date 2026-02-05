@@ -41,6 +41,7 @@ id, type, category, name, direction, amount, date, notes, createdAt
 - `GET /api/drive/auth-url`
 - `GET /api/drive/oauth2callback`
 - `POST /api/drive/backup`
+- `POST /api/drive/import`
 
 ## Autocomplete Providers
 
@@ -58,6 +59,7 @@ server/.drive_token.json
 ```
 
 The backup flow creates/uses a folder named `Investment Atlas` and uploads/updates `investments.xlsx`.
+The import flow downloads that same file and replaces the local ledger.
 
 ## Packaging (Option 5)
 

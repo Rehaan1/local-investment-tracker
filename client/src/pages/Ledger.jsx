@@ -21,8 +21,10 @@ function Ledger({
   driveStatus,
   driveMessage,
   isBackingUp,
+  isImportingFromDrive,
   onConnectDrive,
   onDriveBackup,
+  onDriveImport,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -272,6 +274,13 @@ function Ledger({
               disabled={!driveStatus.connected || isBackingUp}
             >
               {isBackingUp ? "Backing Up..." : "Backup Now"}
+            </button>
+            <button
+              className="button ghost tiny"
+              onClick={onDriveImport}
+              disabled={!driveStatus.connected || isImportingFromDrive}
+            >
+              {isImportingFromDrive ? "Importing..." : "Import from Drive"}
             </button>
           </div>
           {driveMessage && <p className="hint">{driveMessage}</p>}

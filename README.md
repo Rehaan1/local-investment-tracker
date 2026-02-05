@@ -65,7 +65,8 @@ Results are cached for a few hours to reduce API calls. There is also a
 ## Google Drive Backup
 
 Click "Connect Drive" once to authorize, then "Backup Now" to upload/update the
-Excel file in Google Drive inside a folder named `Investment Atlas`.
+Excel file in Google Drive inside a folder named `Investment Atlas`. Use
+"Import from Drive" to restore the local ledger from that same backup file.
 
 1. Create OAuth credentials in Google Cloud (Desktop or Web App).
 2. Add to `server/.env`:
