@@ -24,6 +24,7 @@ const CATEGORY_OPTIONS = [
   "RSU",
   "Flexi Cap",
   "Multi Cap",
+  "Sectoral",
   "Debt",
   "Hybrid",
   "International",
